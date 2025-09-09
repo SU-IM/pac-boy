@@ -500,14 +500,21 @@ function setup() {
   textFont(font);
   noSmooth(); // For pixel art style
 
-  cameraAvailable = false;
-
+  cameraAvailable = false; // 기본값 false
+  
+  // 카메라 초기화 시도
   try {
-    video = createCapture(VIDEO, videoReady, videoError);
+    video = createCapture(VIDEO);
     video.size(width, height);
     video.hide();
+    
+    // 카메라가 성공적으로 생성되면 true로 설정
+    if (video) {
+      cameraAvailable = true;
+      console.log('카메라 초기화 성공');
+    }
   } catch (error) {
-    console.log('카메라 접근 실패, 버튼 모드만 사용 가능');
+    console.log('카메라 초기화 실패:', error);
     cameraAvailable = false;
     video = null;
   }
@@ -572,7 +579,17 @@ function keyPressed() {
 
 // ─────────────────────────── GAME STATE SCREENS & INPUT ────────────────
 
+function checkCameraStatus() {
+  if (video && video.elt && video.elt.videoWidth > 0 && video.elt.videoHeight > 0) {
+    return true; // 실제 비디오 스트림이 있음
+  }
+  return false; // 비디오 스트림이 없음
+}
+
 function drawMainMenuScreen() {
+
+  const actualCameraWorking = checkCameraStatus();
+  
   textAlign(CENTER, CENTER);
   fill(255, 204, 0);
   textSize(200);
@@ -584,7 +601,7 @@ function drawMainMenuScreen() {
   
   fill(200);
   textSize(35);
-  if (!cameraAvailable) {
+  if (!actualCameraWorking) {
     fill(255, 100, 100);
     textSize(40);
     text("Camera Not Available - Button Mode Only", width / 2, height * 0.75);
@@ -606,12 +623,15 @@ let selectedModeIndex = 0; // Keep track of selection in mode select
 const modes = ["Face Mode", "Button Mode"];
 
 function drawModeSelectScreen() {
+
+  const actualCameraWorking = checkCameraStatus();
+
   textAlign(CENTER, CENTER);
   fill(255);
   textSize(80);
   text("MODE SELECT", width / 2, height * 0.2);
 
-  if (!cameraAvailable) {
+  if (!actualCameraWorking) {
     // 카메라가 없을 때: Button Mode만 표시
     fill(255);
     textSize(56);
@@ -654,7 +674,10 @@ function drawModeSelectScreen() {
 }
 
 function handleModeSelectInput() {
-  if (!cameraAvailable) {
+  
+  const actualCameraWorking = checkCameraStatus();
+
+  if (!actualCameraWorking) {
     // 카메라가 없을 때는 2번 키만 동작 (Button Mode로 바로 시작)
     if (key === "2") {
       playSound(sounds.button2, 0.5);
@@ -716,8 +739,12 @@ function drawPlayingScreen() {
 
 function handlePlayingInput() {
   if (game.controlMode === CONTROL_MODE.BUTTON) {
-    if (key === "1") game.isButtonMouthOpen = true;
-    if (key === "3") game.isButtonMouthOpen = false;
+    if (key === "1") {
+      game.isButtonMouthOpen = true;
+    }
+    if (key === "3") {
+      game.isButtonMouthOpen = false;
+    }
   }
 }
 

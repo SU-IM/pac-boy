@@ -158,7 +158,7 @@ class Player {
     if (this.sparkleCount > 0) {
       if (this.sparkleTimer <= 0) {
         const nSparks = 4;
-        this.graphics.fill(random(200,255), random(200,255), random(0,100)); // Yellowish-white sparkles
+        this.graphics.fill(random(200, 255), random(200, 255), random(0, 100)); // Yellowish-white sparkles
         for (let i = 0; i < nSparks; i++) {
           const sx = floor(random(1, this.pixelRes - 1));
           const sy = floor(random(1, this.pixelRes - 1));
@@ -308,7 +308,7 @@ class ItemManager {
 
   spawnLifeUpItem() {
     if (game.currentGameState !== GAME_STATE.PLAYING) return;
-     playSound(sounds.reversedLife, 0.5); // Sound cue for life item appearing
+    playSound(sounds.reversedLife, 0.5); // Sound cue for life item appearing
     const y = height / 2;
     const speed = random(GAME_CONFIG.BASE_ITEM_SPEED_MIN, GAME_CONFIG.BASE_ITEM_SPEED_MAX);
     this.items.push(new LifeUpItem(width + GAME_CONFIG.ICON_SIZE, y, speed));
@@ -418,7 +418,7 @@ class Particle {
     this.acc = createVector(0, 0.1); // Gravity
     this.lifespan = 255;
     this.col = col;
-    this.size = random(8,16);
+    this.size = random(8, 16);
   }
   update() {
     this.vel.add(this.acc);
@@ -441,8 +441,8 @@ class ParticleSystem {
   constructor() {
     this.particles = [];
   }
-  add(x,y,color) {
-     this.particles.push(new Particle(x,y,color));
+  add(x, y, color) {
+    this.particles.push(new Particle(x, y, color));
   }
   createBurst(x, y, color, count) {
     for (let i = 0; i < count; i++) {
@@ -500,9 +500,14 @@ function setup() {
   textFont(font);
   noSmooth(); // For pixel art style
 
-  video = createCapture(VIDEO);
-  video.size(width, height);
-  video.hide();
+  try {
+    video = createCapture(VIDEO, videoReady, videoError);
+    video.size(width, height);
+    video.hide();
+  } catch (error) {
+    console.log('카메라 접근 실패, 버튼 모드만 사용 가능');
+    video = null;
+  }
 
   pixelCanvasGraphics = createGraphics(GAME_CONFIG.PIXEL_RES, GAME_CONFIG.PIXEL_RES);
   pixelCanvasGraphics.noSmooth();
@@ -514,6 +519,15 @@ function setup() {
   particleSystem = new ParticleSystem();
 
   game.currentGameState = GAME_STATE.MAIN_MENU;
+}
+
+function videoReady() {
+  console.log('카메라 초기화 성공');
+}
+
+function videoError() {
+  console.log('카메라 접근 실패');
+  video = null;
 }
 
 function draw() {
@@ -639,19 +653,19 @@ function drawPlayingScreen() {
 
   // Check for game over by life
   if (game.life <= 0 && game.currentGameState === GAME_STATE.PLAYING) {
-     game.currentGameState = GAME_STATE.GAME_OVER;
+    game.currentGameState = GAME_STATE.GAME_OVER;
   }
   // Transition to GAME_OVER state is handled by item effects or life check
-   if (game.currentGameState === GAME_STATE.GAME_OVER) {
-        if (sounds.stageBgm && sounds.stageBgm.isPlaying()) {
-            sounds.stageBgm.stop();
-        }
-        playSound(sounds.lose, 0.5);
-        itemManager.stopSpawning();
-        if (game.controlMode === CONTROL_MODE.FACE) {
-            faceMesh.detectStop();
-        }
+  if (game.currentGameState === GAME_STATE.GAME_OVER) {
+    if (sounds.stageBgm && sounds.stageBgm.isPlaying()) {
+      sounds.stageBgm.stop();
     }
+    playSound(sounds.lose, 0.5);
+    itemManager.stopSpawning();
+    if (game.controlMode === CONTROL_MODE.FACE) {
+      faceMesh.detectStop();
+    }
+  }
 }
 
 function handlePlayingInput() {
@@ -689,11 +703,11 @@ function handleGameOverInput() {
 // ─────────────────────────── HELPER FUNCTIONS ─────────────────────────
 
 function playSound(soundObj, volume = 1.0, rate = 1.0) {
-    if (soundObj && soundObj.isLoaded()) {
-        soundObj.setVolume(volume);
-        soundObj.rate(rate);
-        soundObj.play();
-    }
+  if (soundObj && soundObj.isLoaded()) {
+    soundObj.setVolume(volume);
+    soundObj.rate(rate);
+    soundObj.play();
+  }
 }
 
 function resetAndStartGame() {
@@ -704,21 +718,25 @@ function resetAndStartGame() {
 
   player.angle = 0; // Reset Pac-Man's mouth
   player.sparkleCount = 0; // Reset sparkles
-  
+
   itemManager.reset();
   animationManager.reset();
   particleSystem.reset();
 
-  if (game.controlMode === CONTROL_MODE.FACE) {
+  if (game.controlMode === CONTROL_MODE.FACE && video) {
     faceMesh.detectStart(video, (_results) => { faces = _results; });
+  } else if (game.controlMode === CONTROL_MODE.FACE && !video) {
+    // 카메라가 없는데 Face Mode를 선택한 경우 Button Mode로 강제 변경
+    console.log('카메라가 없어 Button Mode로 변경합니다.');
+    game.controlMode = CONTROL_MODE.BUTTON;
   } else {
     faceMesh.detectStop();
   }
-  
+
   itemManager.startSpawning();
   if (sounds.stageBgm) {
-      sounds.stageBgm.setVolume(0.3);
-      sounds.stageBgm.loop();
+    sounds.stageBgm.setVolume(0.3);
+    sounds.stageBgm.loop();
   }
   game.currentGameState = GAME_STATE.PLAYING;
 }
@@ -752,23 +770,23 @@ function computePacmanAngle() {
 }
 
 function getHUDPositions() {
-    const centerX = width / 2;
-    const scoreX = centerX - GAME_CONFIG.HUD_SPACING;
-    const lifeX = centerX + GAME_CONFIG.HUD_SPACING;
-    const scoreStr = `Score: ${game.score}`;
-    const lifeStr = `Life:  ${game.life}`; // Extra space for alignment
-    return {
-        y: GAME_CONFIG.HUD_Y,
-        scorePos: { x: scoreX, y: GAME_CONFIG.HUD_Y },
-        lifePos: { x: lifeX, y: GAME_CONFIG.HUD_Y },
-        scoreTextEndPos: { x: scoreX + textWidth(scoreStr) / 2, y: GAME_CONFIG.HUD_Y },
-        lifeTextEndPos: { x: lifeX + textWidth(lifeStr) / 2, y: GAME_CONFIG.HUD_Y }
-    };
+  const centerX = width / 2;
+  const scoreX = centerX - GAME_CONFIG.HUD_SPACING;
+  const lifeX = centerX + GAME_CONFIG.HUD_SPACING;
+  const scoreStr = `Score: ${game.score}`;
+  const lifeStr = `Life:  ${game.life}`; // Extra space for alignment
+  return {
+    y: GAME_CONFIG.HUD_Y,
+    scorePos: { x: scoreX, y: GAME_CONFIG.HUD_Y },
+    lifePos: { x: lifeX, y: GAME_CONFIG.HUD_Y },
+    scoreTextEndPos: { x: scoreX + textWidth(scoreStr) / 2, y: GAME_CONFIG.HUD_Y },
+    lifeTextEndPos: { x: lifeX + textWidth(lifeStr) / 2, y: GAME_CONFIG.HUD_Y }
+  };
 }
 
 function drawHUD() {
   const hud = getHUDPositions();
-  
+
   textAlign(CENTER, CENTER);
   textSize(64);
   fill(255);

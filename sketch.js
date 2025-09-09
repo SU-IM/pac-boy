@@ -500,12 +500,15 @@ function setup() {
   textFont(font);
   noSmooth(); // For pixel art style
 
+  cameraAvailable = false;
+
   try {
     video = createCapture(VIDEO, videoReady, videoError);
     video.size(width, height);
     video.hide();
   } catch (error) {
     console.log('카메라 접근 실패, 버튼 모드만 사용 가능');
+    cameraAvailable = false;
     video = null;
   }
 
@@ -574,9 +577,22 @@ function drawMainMenuScreen() {
   fill(255, 204, 0);
   textSize(200);
   text("PAC-BOY", width / 2, height / 3);
+  
   fill(255);
   textSize(60);
   text("Press 2 to Start", width / 2, height * 0.65);
+  
+  fill(200);
+  textSize(35);
+  if (!cameraAvailable) {
+    fill(255, 100, 100);
+    textSize(40);
+    text("Camera Not Available - Button Mode Only", width / 2, height * 0.75);
+  } else {
+    fill(100, 255, 100); 
+    textSize(40);
+    text("Camera Ready - All Modes Available", width / 2, height * 0.75);
+  }
 }
 
 function handleMainMenuInput() {
@@ -595,39 +611,69 @@ function drawModeSelectScreen() {
   textSize(80);
   text("MODE SELECT", width / 2, height * 0.2);
 
-  const rules = [
-    "Open your mouth to control Pac-Boy",
-    "Press 1 to open, 3 to close the mouth",
-  ];
-  textSize(56);
-  fill(255);
-  text("In-game Rule:", width / 2, height / 3);
-  textSize(48);
-  text(rules[selectedModeIndex], width / 2, height / 2 - 50);
-
-  for (let i = 0; i < modes.length; i++) {
+  if (!cameraAvailable) {
+    // 카메라가 없을 때: Button Mode만 표시
+    fill(255);
+    textSize(56);
+    text("In-game Rule:", width / 2, height / 3);
     textSize(48);
-    if (i === selectedModeIndex) fill(255, 204, 0);
-    else fill(200);
-    text(modes[i], width / 2 + (i - 0.5) * (width / 4), height / 1.8);
-  }
+    text("Press 1 to open, 3 to close the mouth", width / 2, height / 2 - 50);
+    
+    // Button Mode를 중앙에 표시
+    fill(255, 204, 0);
+    textSize(48);
+    text("Button Mode", width / 2, height / 1.8);
+    
+    fill(255);
+    textSize(32);
+    text("Press 2 to Start", width / 2, height * 0.75);
+    
+  } else {
+    // 카메라가 있을 때: 기존 코드 (두 모드 선택 가능)
+    const rules = [
+      "Open your mouth to control Pac-Boy",
+      "Press 1 to open, 3 to close the mouth",
+    ];
+    textSize(56);
+    fill(255);
+    text("In-game Rule:", width / 2, height / 3);
+    textSize(48);
+    text(rules[selectedModeIndex], width / 2, height / 2 - 50);
 
-  fill(255);
-  textSize(32);
-  text("Press 1 / 3 to Select Mode, Press 2 to Start", width / 2, height * 0.75);
+    for (let i = 0; i < modes.length; i++) {
+      textSize(48);
+      if (i === selectedModeIndex) fill(255, 204, 0);
+      else fill(200);
+      text(modes[i], width / 2 + (i - 0.5) * (width / 4), height / 1.8);
+    }
+
+    fill(255);
+    textSize(32);
+    text("Press 1 / 3 to Select Mode, Press 2 to Start", width / 2, height * 0.75);
+  }
 }
 
 function handleModeSelectInput() {
-  if (key === "1") {
-    playSound(sounds.button1_3, 0.5);
-    selectedModeIndex = max(0, selectedModeIndex - 1);
-  } else if (key === "3") {
-    playSound(sounds.button1_3, 0.5);
-    selectedModeIndex = min(modes.length - 1, selectedModeIndex + 1);
-  } else if (key === "2") {
-    playSound(sounds.button2, 0.5);
-    game.controlMode = modes[selectedModeIndex] === "Face Mode" ? CONTROL_MODE.FACE : CONTROL_MODE.BUTTON;
-    resetAndStartGame();
+  if (!cameraAvailable) {
+    // 카메라가 없을 때는 2번 키만 동작 (Button Mode로 바로 시작)
+    if (key === "2") {
+      playSound(sounds.button2, 0.5);
+      game.controlMode = CONTROL_MODE.BUTTON;
+      resetAndStartGame();
+    }
+  } else {
+    // 카메라가 있을 때는 기존 로직
+    if (key === "1") {
+      playSound(sounds.button1_3, 0.5);
+      selectedModeIndex = max(0, selectedModeIndex - 1);
+    } else if (key === "3") {
+      playSound(sounds.button1_3, 0.5);
+      selectedModeIndex = min(modes.length - 1, selectedModeIndex + 1);
+    } else if (key === "2") {
+      playSound(sounds.button2, 0.5);
+      game.controlMode = modes[selectedModeIndex] === "Face Mode" ? CONTROL_MODE.FACE : CONTROL_MODE.BUTTON;
+      resetAndStartGame();
+    }
   }
 }
 
@@ -723,14 +769,18 @@ function resetAndStartGame() {
   animationManager.reset();
   particleSystem.reset();
 
-  if (game.controlMode === CONTROL_MODE.FACE && video) {
-    faceMesh.detectStart(video, (_results) => { faces = _results; });
-  } else if (game.controlMode === CONTROL_MODE.FACE && !video) {
-    // 카메라가 없는데 Face Mode를 선택한 경우 Button Mode로 강제 변경
-    console.log('카메라가 없어 Button Mode로 변경합니다.');
+  if (game.controlMode === CONTROL_MODE.FACE && (!video || !cameraAvailable)) {
+    console.log('카메라를 사용할 수 없어 Button Mode로 자동 전환합니다.');
     game.controlMode = CONTROL_MODE.BUTTON;
+  }
+
+  if (game.controlMode === CONTROL_MODE.FACE && video && cameraAvailable) {
+    faceMesh.detectStart(video, (_results) => { faces = _results; });
   } else {
-    faceMesh.detectStop();
+    // Button Mode이거나 카메라가 없는 경우
+    if (faceMesh) {
+      faceMesh.detectStop();
+    }
   }
 
   itemManager.startSpawning();
